@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { Product, PromoCode } from '../types';
-import { FEATURED_PRODUCTS } from '../constants';
+import { fetchProducts, createProduct as apiCreateProduct, updateProduct as apiUpdateProduct, deleteProduct as apiDeleteProduct } from '../api/products';
+import { fetchPromoCodes, createPromoCode as apiCreatePromoCode, deletePromoCode as apiDeletePromoCode } from '../api/promoCodes';
 
 interface CartItem extends Product {
   quantity: number;
@@ -43,14 +44,30 @@ const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // --- STATE ---
-  const [products, setProducts] = useState<Product[]>(FEATURED_PRODUCTS);
+  const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-  const [promoCodes, setPromoCodes] = useState<PromoCode[]>([
-    { code: 'WELCOME50', discountAmount: 50, expiryDate: '2025-12-31' },
-    { code: 'KATE200', discountAmount: 200, expiryDate: '2025-12-31' }
-  ]);
+  const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // --- LOAD DATA FROM DATABASE ---
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      // Load products from database
+      const productsData = await fetchProducts();
+      setProducts(productsData);
+      
+      // Load promo codes from database
+      const promosData = await fetchPromoCodes();
+      setPromoCodes(promosData);
+      
+      setLoading(false);
+    };
+    
+    loadData();
+  }, []);
 
   // --- PERSISTENCE ---
   useEffect(() => {
@@ -59,13 +76,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     
     const savedUser = localStorage.getItem('moden_kate_user');
     if (savedUser) setUser(JSON.parse(savedUser));
-
-    // In a real app, products would come from DB. Here we check if we have modified ones saved.
-    const savedProducts = localStorage.getItem('moden_kate_products');
-    if (savedProducts) setProducts(JSON.parse(savedProducts));
-
-    const savedPromos = localStorage.getItem('moden_kate_promos');
-    if (savedPromos) setPromoCodes(JSON.parse(savedPromos));
   }, []);
 
   useEffect(() => {
@@ -76,14 +86,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     if (user) localStorage.setItem('moden_kate_user', JSON.stringify(user));
     else localStorage.removeItem('moden_kate_user');
   }, [user]);
-
-  useEffect(() => {
-    localStorage.setItem('moden_kate_products', JSON.stringify(products));
-  }, [products]);
-
-  useEffect(() => {
-    localStorage.setItem('moden_kate_promos', JSON.stringify(promoCodes));
-  }, [promoCodes]);
 
   // --- CART ACTIONS ---
   const addToCart = (product: Product) => {
@@ -134,24 +136,39 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const adminLogout = () => setIsAdminLoggedIn(false);
 
-  const addProduct = (p: Product) => {
-    setProducts(prev => [p, ...prev]);
+  const addProduct = async (p: Product) => {
+    const newProduct = await apiCreateProduct(p);
+    if (newProduct) {
+      setProducts(prev => [newProduct, ...prev]);
+    }
   };
 
-  const updateProduct = (updatedProduct: Product) => {
-    setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+  const updateProduct = async (updatedProduct: Product) => {
+    const updated = await apiUpdateProduct(updatedProduct.id, updatedProduct);
+    if (updated) {
+      setProducts(prev => prev.map(p => p.id === updated.id ? updated : p));
+    }
   };
 
-  const deleteProduct = (id: string) => {
-    setProducts(prev => prev.filter(p => p.id !== id));
+  const deleteProduct = async (id: string) => {
+    const success = await apiDeleteProduct(id);
+    if (success) {
+      setProducts(prev => prev.filter(p => p.id !== id));
+    }
   };
 
-  const addPromoCode = (code: PromoCode) => {
-    setPromoCodes(prev => [...prev, code]);
+  const addPromoCode = async (code: PromoCode) => {
+    const newPromo = await apiCreatePromoCode(code);
+    if (newPromo) {
+      setPromoCodes(prev => [...prev, newPromo]);
+    }
   };
 
-  const removePromoCode = (codeStr: string) => {
-    setPromoCodes(prev => prev.filter(c => c.code !== codeStr));
+  const removePromoCode = async (codeStr: string) => {
+    const success = await apiDeletePromoCode(codeStr);
+    if (success) {
+      setPromoCodes(prev => prev.filter(c => c.code !== codeStr));
+    }
   };
 
   const cartTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);

@@ -4,7 +4,8 @@ export interface Product {
   name: string;
   category: string;
   price: number;
-  image: string;
+  image: string; // Primary image (for backward compatibility)
+  images?: string[]; // Array of image URLs
   badge?: 'New Arrival' | 'Best Seller' | 'Sale';
   specs?: string[];
   colors?: string[];
@@ -26,6 +27,6 @@ export interface WatchFace {
 
 export interface PromoCode {
   code: string;
-  discountAmount: number;
+  percentageDiscount: number; // 1-100
   expiryDate: string; // YYYY-MM-DD
 }

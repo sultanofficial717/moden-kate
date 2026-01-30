@@ -21,6 +21,7 @@ export const Admin: React.FC = () => {
   const [isEditing, setIsEditing] = useState<Product | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [productForm, setProductForm] = useState<Partial<Product>>({});
+  const [productImages, setProductImages] = useState<string[]>([]);
 
   // Promo State
   const [promoForm, setPromoForm] = useState({ code: '', discountAmount: 0, expiryDate: '' });
@@ -37,44 +38,80 @@ export const Admin: React.FC = () => {
     p.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSaveProduct = () => {
+  const handleSaveProduct = async () => {
     if (!productForm.name || !productForm.price) return;
     
-    const newProduct = {
-      ...productForm,
-      id: isEditing ? isEditing.id : `p${Date.now()}`,
-      specs: productForm.specs || [],
-      image: productForm.image || 'https://picsum.photos/400',
-    } as Product;
-
-    if (isEditing) {
-      updateProduct(newProduct);
-    } else {
-      addProduct(newProduct);
+    // Filter out empty image URLs
+    const imageUrls = productImages.filter(img => img?.trim());
+    
+    if (imageUrls.length === 0) {
+      alert('Please add at least one product image');
+      return;
     }
-    closeProductModal();
+    
+    const productData = {
+      name: productForm.name,
+      category: productForm.category || 'Uncategorized',
+      price: productForm.price,
+      image: imageUrls[0], // Primary image is the first one
+      images: imageUrls,
+      badge: productForm.badge || null,
+      specs: productForm.specs || [],
+      colors: productForm.colors || [],
+      description: productForm.description || '',
+      stock_quantity: 100,
+      is_active: true,
+    };
+
+    try {
+      if (isEditing) {
+        await updateProduct({ ...productData, id: isEditing.id } as Product);
+        alert('Product updated successfully!');
+      } else {
+        await addProduct(productData as Product);
+        alert('Product created successfully!');
+      }
+      closeProductModal();
+    } catch (error) {
+      console.error('Error saving product:', error);
+      alert('Failed to save product. Please check console for details.');
+    }
   };
 
   const closeProductModal = () => {
     setIsEditing(null);
     setIsAdding(false);
     setProductForm({});
+    setProductImages([]);
   };
 
   const openEdit = (p: Product) => {
     setIsEditing(p);
     setProductForm(p);
+    setProductImages(p.images || [p.image]);
   };
 
-  const handleAddPromo = (e: React.FormEvent) => {
+  const handleAddPromo = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (promoForm.code && promoForm.discountAmount > 0 && promoForm.expiryDate) {
-      addPromoCode({
+    const percentage = Number(promoForm.discountAmount);
+    
+    // Validate percentage is between 1-100
+    if (!promoForm.code || percentage < 1 || percentage > 100 || !promoForm.expiryDate) {
+      alert('Please enter a valid promo code and discount percentage (1-100)');
+      return;
+    }
+    
+    try {
+      await addPromoCode({
         code: promoForm.code.toUpperCase(),
-        discountAmount: Number(promoForm.discountAmount),
+        percentageDiscount: percentage,
         expiryDate: promoForm.expiryDate
       });
       setPromoForm({ code: '', discountAmount: 0, expiryDate: '' });
+      alert('Promo code created successfully!');
+    } catch (error) {
+      console.error('Error creating promo code:', error);
+      alert('Failed to create promo code. Please check console for details.');
     }
   };
 
@@ -208,7 +245,10 @@ CREATE TABLE orders (
                 />
               </div>
               <button 
-                onClick={() => setIsAdding(true)}
+                onClick={() => {
+                  setIsAdding(true);
+                  setProductImages(['']);
+                }}
                 className="bg-brand-green text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 transition-colors"
               >
                 <Plus size={18} /> Add Product
@@ -274,14 +314,23 @@ CREATE TABLE orders (
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Discount Amount (Rs.)</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase">Discount Percentage (%)</label>
                     <input 
                       type="number" 
                       value={promoForm.discountAmount}
-                      onChange={e => setPromoForm({...promoForm, discountAmount: Number(e.target.value)})}
+                      onChange={e => {
+                        const value = Number(e.target.value);
+                        if (value >= 1 && value <= 100) {
+                          setPromoForm({...promoForm, discountAmount: value});
+                        }
+                      }}
+                      min="1"
+                      max="100"
                       className="w-full p-2 border border-gray-200 rounded mt-1"
+                      placeholder="e.g., 20 (for 20%)"
                       required
                     />
+                    <p className="text-xs text-gray-400 mt-1">Value must be between 1-100</p>
                   </div>
                   <div>
                     <label className="text-xs font-bold text-gray-500 uppercase">Expiry Date</label>
@@ -309,7 +358,7 @@ CREATE TABLE orders (
                       </div>
                       <div>
                         <h4 className="font-bold text-xl tracking-wider">{promo.code}</h4>
-                        <p className="text-sm text-gray-500">Discount: Rs. {promo.discountAmount}</p>
+                        <p className="text-sm text-gray-500">Discount: {promo.percentageDiscount}%</p>
                       </div>
                     </div>
                     <div className="text-right">
@@ -471,13 +520,37 @@ CREATE TABLE orders (
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Image URL</label>
-                    <input 
-                      className="w-full p-2 border border-gray-200 rounded mt-1 text-sm" 
-                      value={productForm.image || ''} 
-                      onChange={e => setProductForm({...productForm, image: e.target.value})}
-                      placeholder="https://..."
-                    />
+                    <label className="text-xs font-bold text-gray-500 uppercase">Product Images</label>
+                    <div className="space-y-2 mt-2">
+                      {productImages.map((img, idx) => (
+                        <div key={idx} className="flex gap-2">
+                          <input 
+                            className="flex-1 p-2 border border-gray-200 rounded text-sm" 
+                            value={img} 
+                            onChange={e => {
+                              const newImages = [...productImages];
+                              newImages[idx] = e.target.value;
+                              setProductImages(newImages);
+                            }}
+                            placeholder="https://..."
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setProductImages(productImages.filter((_, i) => i !== idx))}
+                            className="px-3 py-2 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setProductImages([...productImages, ''])}
+                        className="w-full p-2 border-2 border-dashed border-gray-300 rounded text-sm text-gray-500 hover:border-brand-green hover:text-brand-green transition-colors"
+                      >
+                        + Add Image
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="text-xs font-bold text-gray-500 uppercase">Badge (Optional)</label>
