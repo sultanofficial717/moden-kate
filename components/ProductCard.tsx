@@ -1,5 +1,5 @@
-import React from 'react';
-import { ShoppingCart, Heart } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShoppingCart, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Product } from '../types';
 import { useStore } from '../context/StoreContext';
 
@@ -9,6 +9,11 @@ interface ProductCardProps {
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const { addToCart } = useStore();
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  
+  // Get images array, fallback to single image
+  const images = product.images && product.images.length > 0 ? product.images : [product.image];
+  const currentImage = images[currentImageIndex];
 
   // Color logic for strategic functions
   const getBadgeStyle = (badge: string) => {
@@ -31,10 +36,41 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         )}
         
         <img 
-          src={product.image} 
+          src={currentImage} 
           alt={product.name}
           className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700 ease-out"
         />
+
+        {/* Image Gallery Navigation */}
+        {images.length > 1 && (
+          <>
+            <button
+              onClick={() => setCurrentImageIndex((currentImageIndex - 1 + images.length) % images.length)}
+              className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-white/80 hover:bg-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-all z-5"
+            >
+              <ChevronLeft size={18} className="text-gray-700" />
+            </button>
+            <button
+              onClick={() => setCurrentImageIndex((currentImageIndex + 1) % images.length)}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-white/80 hover:bg-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-all z-5"
+            >
+              <ChevronRight size={18} className="text-gray-700" />
+            </button>
+            
+            {/* Image Indicators */}
+            <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {images.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentImageIndex(idx)}
+                  className={`w-2 h-2 rounded-full transition-colors ${
+                    idx === currentImageIndex ? 'bg-brand-lime' : 'bg-white/50'
+                  }`}
+                />
+              ))}
+            </div>
+          </>
+        )}
 
         {/* Hover Actions */}
         <div className="absolute top-4 right-4 flex flex-col gap-2 translate-x-10 group-hover:translate-x-0 transition-transform duration-300">

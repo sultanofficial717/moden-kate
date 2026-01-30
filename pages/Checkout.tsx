@@ -3,7 +3,8 @@ import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Truck, CreditCard, CheckCircle, ArrowRight, User as UserIcon, Mail, Ticket, X, ShieldCheck, Zap, Award, FileCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PromoCode } from '../types';
+import { validatePromoCode } from '../api/promoCodes';
+import { createOrder } from '../api/orders';
 
 export const Checkout: React.FC = () => {
   const { user, login, cart, cartTotal, clearCart, promoCodes } = useStore();
@@ -28,13 +29,6 @@ export const Checkout: React.FC = () => {
   const [promoInput, setPromoInput] = useState('');
   const [appliedDiscount, setAppliedDiscount] = useState(0);
   const [promoMessage, setPromoMessage] = useState<{text: string, type: 'success' | 'error'} | null>(null);
-  const [availablePromos, setAvailablePromos] = useState<PromoCode[]>([]);
-
-  useEffect(() => {
-    // Filter active promos for "Automated" suggestion
-    const today = new Date();
-    setAvailablePromos(promoCodes.filter(p => new Date(p.expiryDate) >= today));
-  }, [promoCodes]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,26 +37,19 @@ export const Checkout: React.FC = () => {
     }
   };
 
-  const executePromoApply = (code: string) => {
-    const promo = promoCodes.find(p => p.code === code);
+  const executePromoApply = async (code: string) => {
+    const promo = await validatePromoCode(code);
     
     if (!promo) {
-      setPromoMessage({ text: 'Invalid Promo Code', type: 'error' });
+      setPromoMessage({ text: 'Invalid or expired promo code', type: 'error' });
       setAppliedDiscount(0);
       return;
     }
 
-    const today = new Date();
-    const expiry = new Date(promo.expiryDate);
-
-    if (expiry < today) {
-        setPromoMessage({ text: 'This code has expired', type: 'error' });
-        setAppliedDiscount(0);
-        return;
-    }
-
-    setAppliedDiscount(promo.discountAmount);
-    setPromoMessage({ text: `Code '${code}' Applied!`, type: 'success' });
+    // Calculate percentage discount
+    const discountAmount = Math.floor((cartTotal * promo.percentageDiscount) / 100);
+    setAppliedDiscount(discountAmount);
+    setPromoMessage({ text: `Code '${code}' Applied! ${promo.percentageDiscount}% off`, type: 'success' });
     setPromoInput(code);
   };
 
@@ -78,19 +65,51 @@ export const Checkout: React.FC = () => {
     setPromoMessage(null);
   };
 
-  const handlePlaceOrder = (e: React.FormEvent) => {
+  const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.address || !formData.phone) {
       alert('Please fill in your delivery details.');
       return;
     }
     
-    // Simulate order processing
-    const confirm = window.confirm(`Order Total: Rs. ${cartTotal + 200 - appliedDiscount}\n\nConfirm order for ${user?.name}?`);
+    const confirm = window.confirm(`Order Total: Rs. ${finalTotal}\n\nConfirm order for ${user?.name}?`);
     if (confirm) {
-      clearCart();
-      navigate('/');
-      alert('Order Placed Successfully! You will receive an SMS shortly.');
+      // Prepare order data
+      const orderData = {
+        guest_info: {
+          name: `${formData.firstName} ${formData.lastName}`,
+          email: user?.email || '',
+          address: formData.address,
+          city: formData.city,
+          zip: formData.zip,
+          phone: formData.phone,
+        },
+        subtotal: cartTotal,
+        delivery_charge: deliveryCharge,
+        discount_amount: appliedDiscount,
+        promo_code: promoInput || undefined,
+        total_amount: finalTotal,
+        payment_method: formData.paymentMethod,
+      };
+
+      const orderItems = cart.map(item => ({
+        product_id: item.id,
+        product_name: item.name,
+        product_image: item.image,
+        quantity: item.quantity,
+        price_at_purchase: item.price,
+      }));
+
+      // Save order to database
+      const order = await createOrder(orderData, orderItems);
+      
+      if (order) {
+        clearCart();
+        navigate('/');
+        alert('Order Placed Successfully! You will receive an SMS shortly.');
+      } else {
+        alert('Failed to place order. Please try again.');
+      }
     }
   };
 
@@ -354,30 +373,11 @@ export const Checkout: React.FC = () => {
                 ))}
               </div>
 
-              {/* Automated Promo Section */}
+              {/* Promo Code Input Section */}
               <div className="mb-6 pt-4 border-t border-white/10">
                 <label className="text-xs font-bold text-brand-lime uppercase mb-3 flex items-center gap-2">
-                    <Ticket size={14} /> Available Offers
+                    <Ticket size={14} /> Promo Code
                 </label>
-                
-                {/* Auto-Suggestions */}
-                <div className="flex flex-wrap gap-2 mb-4">
-                    {availablePromos.map(promo => (
-                        <button
-                            key={promo.code}
-                            onClick={() => executePromoApply(promo.code)}
-                            disabled={appliedDiscount > 0}
-                            className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
-                                promoInput === promo.code 
-                                ? 'bg-brand-lime text-brand-deep border-brand-lime' 
-                                : 'bg-transparent text-brand-champagne border-brand-champagne/30 hover:border-brand-lime hover:text-brand-lime'
-                            }`}
-                        >
-                            {promo.code} (-Rs.{promo.discountAmount})
-                        </button>
-                    ))}
-                    {availablePromos.length === 0 && <span className="text-xs text-gray-500">No active offers</span>}
-                </div>
 
                 <div className="flex gap-2">
                     <div className="relative flex-grow">
