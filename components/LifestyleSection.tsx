@@ -98,7 +98,7 @@ export const LifestyleSection: React.FC = () => {
                 transition={{ duration: 1 }}
                 className="text-5xl md:text-7xl font-serif text-white mb-6 drop-shadow-lg"
             >
-                "Create without <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-lime to-white">limits</span>."
+                "Create <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-200">legacy</span> without <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-lime to-white">limits</span>."
             </motion.h2>
              <motion.div 
                 initial={{ w: 0 }}
