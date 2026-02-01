@@ -39,7 +39,10 @@ export const Admin: React.FC = () => {
   );
 
   const handleSaveProduct = async () => {
-    if (!productForm.name || !productForm.price) return;
+    if (!productForm.name || !productForm.price) {
+      alert('Product name and price are required');
+      return;
+    }
     
     // Filter out empty image URLs
     const imageUrls = productImages.filter(img => img?.trim());
@@ -56,8 +59,7 @@ export const Admin: React.FC = () => {
       image: imageUrls[0], // Primary image is the first one
       images: imageUrls,
       badge: productForm.badge || null,
-      specs: productForm.specs || [],
-      colors: productForm.colors || [],
+      specs: productForm.specs || null, // JSONB field in database
       description: productForm.description || '',
       stock_quantity: 100,
       is_active: true,
@@ -564,6 +566,15 @@ CREATE TABLE orders (
                        <option value="Best Seller">Best Seller</option>
                        <option value="Sale">Sale</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase">Description (Optional)</label>
+                    <textarea 
+                      className="w-full p-2 border border-gray-200 rounded mt-1 min-h-[80px]" 
+                      value={productForm.description || ''} 
+                      onChange={e => setProductForm({...productForm, description: e.target.value})}
+                      placeholder="Enter product description..."
+                    />
                   </div>
                 </div>
 

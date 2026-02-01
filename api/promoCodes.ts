@@ -41,6 +41,13 @@ export const validatePromoCode = async (code: string): Promise<PromoCode | null>
 export const createPromoCode = async (promo: PromoCode): Promise<PromoCode | null> => {
   try {
     console.log('Creating promo code:', promo);
+    const token = localStorage.getItem('admin_token');
+    if (!token) {
+      console.error('No admin token found');
+      alert('Not authenticated. Please log in again.');
+      return null;
+    }
+    
     const payload = {
       code: promo.code,
       percentage_discount: promo.percentageDiscount,
@@ -50,7 +57,10 @@ export const createPromoCode = async (promo: PromoCode): Promise<PromoCode | nul
     console.log('Payload:', payload);
     const response = await fetch(API_ENDPOINTS.promoCodes, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify(payload),
     });
     console.log('Response status:', response.status);
@@ -75,8 +85,17 @@ export const createPromoCode = async (promo: PromoCode): Promise<PromoCode | nul
 
 export const deletePromoCode = async (code: string): Promise<boolean> => {
   try {
+    const token = localStorage.getItem('admin_token');
+    if (!token) {
+      console.error('No admin token found');
+      return false;
+    }
+    
     const response = await fetch(`${API_ENDPOINTS.promoCodes}/${code}`, {
       method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
     });
     return response.ok;
   } catch (error) {
