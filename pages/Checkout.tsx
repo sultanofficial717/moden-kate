@@ -199,7 +199,7 @@ export const Checkout: React.FC = () => {
                 </div>
               </div>
               
-              <button type="submit" className="w-full bg-brand-lime text-brand-deep py-3 rounded-xl font-bold hover:bg-white transition-colors shadow-lg shadow-brand-lime/20 flex items-center justify-center gap-2">
+              <button type="submit" className="w-full bg-brand-lime text-brand-deep py-3 rounded-full font-bold hover:bg-white transition-all duration-300 shadow-lg shadow-brand-lime/20 flex items-center justify-center gap-2 hover:scale-105 hover:-translate-y-1">
                 Secure Login <ArrowRight size={18} />
               </button>
             </form>
@@ -391,11 +391,11 @@ export const Checkout: React.FC = () => {
                         />
                     </div>
                     {appliedDiscount > 0 ? (
-                        <button onClick={removePromo} className="bg-red-500/20 text-red-400 border border-red-500/50 px-3 py-2 rounded-lg hover:bg-red-500/30 transition-colors">
+                        <button onClick={removePromo} className="bg-red-500/20 text-red-400 border border-red-500/50 px-3 py-2 rounded-full hover:bg-red-500/30 transition-all duration-300 hover:scale-105">
                             <X size={18} />
                         </button>
                     ) : (
-                        <button onClick={handleApplyPromo} className="bg-brand-lime text-brand-deep px-4 py-2 rounded-lg text-sm font-bold hover:bg-white transition-colors">
+                        <button onClick={handleApplyPromo} className="bg-brand-lime text-brand-deep px-4 py-2 rounded-full text-sm font-bold hover:bg-white transition-all duration-300 hover:scale-105">
                             Apply
                         </button>
                     )}
@@ -438,7 +438,7 @@ export const Checkout: React.FC = () => {
               <button 
                 form="checkout-form" 
                 type="submit"
-                className="w-full bg-brand-lime text-brand-deep py-4 rounded-xl font-bold shadow-lg shadow-brand-lime/30 hover:bg-white hover:shadow-xl transition-all transform active:scale-95 flex items-center justify-center gap-2 group"
+                className="w-full bg-brand-lime text-brand-deep py-4 rounded-full font-bold shadow-lg shadow-brand-lime/30 hover:bg-white hover:shadow-xl transition-all duration-300 transform hover:scale-105 hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-2 group"
               >
                 Place Order <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
               </button>

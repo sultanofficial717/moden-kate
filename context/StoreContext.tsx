@@ -50,24 +50,48 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   // --- LOAD DATA FROM DATABASE ---
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      // Load products from database
-      const productsData = await fetchProducts();
-      setProducts(productsData);
+      setError(null);
       
-      // Load promo codes from database
-      const promosData = await fetchPromoCodes();
-      setPromoCodes(promosData);
-      
-      setLoading(false);
+      try {
+        // Load products from database
+        const productsData = await fetchProducts();
+        if (!productsData || productsData.length === 0) {
+          console.warn('No products loaded from database');
+        }
+        setProducts(productsData);
+        
+        // Load promo codes from database
+        const promosData = await fetchPromoCodes();
+        setPromoCodes(promosData);
+        
+        setError(null);
+        setRetryCount(0);
+      } catch (err) {
+        console.error('Failed to load data:', err);
+        const errorMessage = 'Failed to connect to server. Please check if backend is running on http://localhost:5000';
+        setError(errorMessage);
+        
+        // Auto-retry up to 3 times with exponential backoff
+        if (retryCount < 3) {
+          const delay = Math.min(1000 * Math.pow(2, retryCount), 10000);
+          setTimeout(() => {
+            setRetryCount(prev => prev + 1);
+          }, delay);
+        }
+      } finally {
+        setLoading(false);
+      }
     };
     
     loadData();
-  }, []);
+  }, [retryCount]);
 
   // --- PERSISTENCE ---
   useEffect(() => {
@@ -125,33 +149,59 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setUser(null);
   };
 
-  // --- ADMIN ACTIONS ---
-  const adminLogin = (u: string, p: string) => {
-    if (u === 'boss919' && p === 'kate123') {
+  // --- ADMIN LOGIN (using backend authentication) ---
+  const adminLogin = async (username: string, password: string) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        alert(error.error || 'Login failed');
+        return false;
+      }
+
+      const data = await response.json();
+      // Store token in localStorage
+      localStorage.setItem('admin_token', data.token);
+      localStorage.setItem('admin_user', JSON.stringify(data.user));
       setIsAdminLoggedIn(true);
       return true;
+    } catch (error) {
+      console.error('Login error:', error);
+      alert('Failed to connect to server. Please check if backend is running.');
+      return false;
     }
-    return false;
   };
 
-  const adminLogout = () => setIsAdminLoggedIn(false);
+  const adminLogout = () => {
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_user');
+    setIsAdminLoggedIn(false);
+  };
 
   const addProduct = async (p: Product) => {
-    const newProduct = await apiCreateProduct(p);
+    const token = localStorage.getItem('admin_token');
+    const newProduct = await apiCreateProduct(p, token);
     if (newProduct) {
       setProducts(prev => [newProduct, ...prev]);
     }
   };
 
   const updateProduct = async (updatedProduct: Product) => {
-    const updated = await apiUpdateProduct(updatedProduct.id, updatedProduct);
+    const token = localStorage.getItem('admin_token');
+    const updated = await apiUpdateProduct(updatedProduct.id, updatedProduct, token);
     if (updated) {
       setProducts(prev => prev.map(p => p.id === updated.id ? updated : p));
     }
   };
 
   const deleteProduct = async (id: string) => {
-    const success = await apiDeleteProduct(id);
+    const token = localStorage.getItem('admin_token');
+    const success = await apiDeleteProduct(id, token);
     if (success) {
       setProducts(prev => prev.filter(p => p.id !== id));
     }
@@ -174,6 +224,15 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const cartTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
   const cartCount = cart.reduce((count, item) => count + item.quantity, 0);
 
+  // Show loading or error states
+  if (loading && products.length === 0) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <p>Loading store data...</p>
+      </div>
+    );
+  }
+
   return (
     <StoreContext.Provider value={{ 
       cart, user, products, promoCodes,
@@ -182,8 +241,27 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       cartTotal, cartCount,
       isAdminLoggedIn, adminLogin, adminLogout,
       addProduct, updateProduct, deleteProduct,
-      addPromoCode, removePromoCode
+      addPromoCode, removePromoCode,
+      error,
+      loading
     }}>
+      {error && (
+        <div style={{ 
+          padding: '1rem', 
+          background: '#fee', 
+          color: '#c00', 
+          textAlign: 'center',
+          borderBottom: '1px solid #fcc'
+        }}>
+          ⚠️ {error}
+          <button 
+            onClick={() => setRetryCount(0)}
+            style={{ marginLeft: '1rem', padding: '0.5rem 1rem', cursor: 'pointer' }}
+          >
+            Retry Connection
+          </button>
+        </div>
+      )}
       {children}
     </StoreContext.Provider>
   );
